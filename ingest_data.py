@@ -1,40 +1,4 @@
-"""IBM Knowledge RAG Assistant - Data Ingestion
-================================================
 
-Pipeline Responsibilities
--------------------------
-1. Load configuration (inline defaults + optional overrides via environment variables or files).
-2. Collect IBM-hosted PDFs (limited to allowed domains) with retry logic.
-3. Scrape a curated set of IBM blog/article pages; clean, deduplicate, and persist unified text.
-4. Generate a synthetic HR-style CSV dataset (deterministic for reproducibility).
-5. Emit a JSON manifest summarizing ingested artifacts (paths, counts, timestamps).
-
-Run:
-        python ingest_data.py
-
-Configuration Overrides
------------------------
-- Custom PDF URL file: ``data/ibm_pdf_urls.txt`` (one IBM PDF URL per line).
-- Environment variables (optional):
-    * ``INGEST_MAX_PDF=all`` download all PDFs (default if unset).
-    * ``INGEST_MAX_PDF=<number>`` limit number of PDFs.
-    * ``INGEST_MAX_SCRAPE_PAGES=5`` cap pages visited.
-    * ``INGEST_MIN_PARAGRAPHS=15`` minimum paragraphs before fallback text injection.
-
-Outputs
--------
-- ``data/pdfs/`` downloaded PDFs
-- ``data/website_text.txt`` cleaned aggregated paragraphs
-- ``data/ibm_hr.csv`` synthetic HR dataset
-- ``data/ingest_manifest.json`` summary of the run
-
-Design Notes
-------------
-- Resilient networking via a shared ``requests.Session`` with backoff retries.
-- Paragraph cleaning removes extra whitespace and deduplicates identical paragraphs.
-- Explicit domain filtering ensures IBM-only PDF sources.
-- Manifest enables downstream indexing sanity checks and reproducible audits.
-"""
 from __future__ import annotations
 
 import os

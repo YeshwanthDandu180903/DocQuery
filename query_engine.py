@@ -33,25 +33,17 @@ from dotenv import load_dotenv
 from rank_bm25 import BM25Okapi
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.schema import Document
+from langchain_core.documents import Document
 
-# LLM (OpenAI or Gemini) or fallback
-try:
-    from langchain_openai import ChatOpenAI
-except ImportError:  # older langchain may use openai directly
-    from langchain.chat_models import ChatOpenAI  # type: ignore
+# LLM: GROQ only (langchain-groq)
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import Runnable
+from langchain_core.output_parsers import StrOutputParser
 
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-except Exception:
-    ChatGoogleGenerativeAI = None  # type: ignore
-try:
-    from langchain_groq import ChatGroq
-except Exception:
-    ChatGroq = None  # type: ignore
+from langchain_groq import ChatGroq
 
+
+load_dotenv()
 EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 PROJECT_ROOT = Path(__file__).parent
@@ -82,7 +74,7 @@ class IBMKnowledgeRAG:
         self.vector_store = self._load_vector_store()
         self.bm25 = self._load_bm25()
         self.corpus_records = self._load_corpus_records()
-        self.llm_chain = self._build_llm_chain()
+        self.llm_chain: Runnable = self._build_llm_chain()
 
     # ------------------ Loading ------------------
     def _load_vector_store(self) -> FAISS:
@@ -112,36 +104,19 @@ class IBMKnowledgeRAG:
                         continue
         return records
 
-    def _build_llm_chain(self):
+    def _build_llm_chain(self) -> Runnable:
         prompt = PromptTemplate(input_variables=["question", "context"], template=DEFAULT_PROMPT)
-
-        # Prefer Groq if key present (user requested Groq for now)
+        # Strictly require GROQ. Do not fall back to other providers.
         groq_key = os.getenv("GROQ_API_KEY")
-        if groq_key and ChatGroq is not None:
-            try:
-                # Fast, cost-effective default
-                llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.2)
-                return LLMChain(llm=llm, prompt=prompt)
-            except Exception:
-                pass
+        if not groq_key:
+            raise EnvironmentError(
+                "GROQ_API_KEY environment variable is required. Set GROQ_API_KEY to use the Groq LLM."
+            )
 
-        # Next prefer Gemini
-        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if gemini_key and ChatGoogleGenerativeAI is not None:
-            try:
-                llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
-                return LLMChain(llm=llm, prompt=prompt)
-            except Exception:
-                pass
-
-        # Fallback to OpenAI if available
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if openai_key:
-            llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2)
-            return LLMChain(llm=llm, prompt=prompt)
-
-        # Fallback pseudo LLM
-        return None
+        model_name = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        llm = ChatGroq(model=model_name, temperature=float(os.getenv("GROQ_TEMPERATURE", "0.2")))
+        # Use LangChain Expression Language (LCEL) instead of the legacy LLMChain
+        return prompt | llm | StrOutputParser()
 
     # ------------------ Retrieval ------------------
     def _vector_search(self, query: str) -> List[Tuple[Document, float]]:
@@ -215,7 +190,7 @@ class IBMKnowledgeRAG:
         joined_context = "\n\n".join(context_lines[:8])
 
         if self.llm_chain:
-            answer = self.llm_chain.run(question=question, context=joined_context).strip()
+            answer = self.llm_chain.invoke({"question": question, "context": joined_context}).strip()
         else:
             # Fallback deterministic summarizer
             answer = (

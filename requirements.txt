@@ -27,3 +27,6 @@ google-generativeai==0.8.3
 
 langchain-google-genai==1.0.9
 langchain-groq==0.2.0
+gradio
+wikipedia==1.4.0
+requests==2.32.2
