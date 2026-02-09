@@ -1,266 +1,156 @@
-# IBM Knowledge RAG Assistant
+# 📚 DocuQuery
 
-## 🎯 Project Overview
+> An intelligent document question-answering system powered by RAG (Retrieval-Augmented Generation)
 
-**Enterprise-grade AI-powered knowledge retrieval system** combining hybrid search technology with professional Gradio interface for intelligent document retrieval and question answering.
+**DocuQuery** lets you ask questions and get accurate answers directly from your documents—no hallucinations, just facts.
 
-**Live Demo:** `http://localhost:7861`
-
----
-
-## ✨ Key Features
-
-- **Hybrid Retrieval Engine**: Vector similarity + BM25 keyword search
-- **LLM Integration**: Groq LLaMA API for intelligent answer generation
-- **Enterprise UI**: Professional dark-themed Gradio interface with IBM branding
-- **Performance Metrics**: Real-time latency and processing analytics
-- **Debug Mode**: Technical insights into retrieval process
-- **Responsive Design**: Mobile-friendly adaptive layout
+This demo uses HR documents (policies, SOPs, FAQs) from a fictional company to showcase how RAG can be applied to any document collection.
 
 ---
 
-## 🏗️ Architecture
+## ✨ Features
 
-### Tech Stack
-- **Frontend**: Gradio (Python web framework)
-- **LLM**: Groq LLaMA (Fast inference API)
-- **Search**: 
-  - Vector: Sentence Transformers + FAISS
-  - Keyword: BM25 (Okapi ranking)
-- **Language**: Python 3.8+
+- 🔍 **Hybrid Search** - Combines semantic (FAISS) and keyword (BM25) retrieval
+- 📄 **Multi-Format Support** - Works with PDFs and Markdown files
+- 🎯 **Source Citations** - Every answer links back to source documents
+- 🚫 **No Hallucinations** - Answers only from your documents
+- 💬 **Interactive UI** - Clean Gradio interface for easy querying
 
-### System Components
+---
 
-```
-┌─────────────────────────────────────────┐
-│   User Query (Gradio Interface)         │
-└──────────────┬──────────────────────────┘
-               │
-       ┌───────▼───────┐
-       │  Query Parser │
-       └───────┬───────┘
-               │
-    ┌──────────┴──────────┐
-    │                     │
-┌───▼────┐          ┌────▼────┐
-│ Vector │          │ Keyword │
-│ Search │          │ Search  │
-│(FAISS) │          │ (BM25)  │
-└───┬────┘          └────┬────┘
-    │                     │
-    └──────────┬──────────┘
-               │
-        ┌──────▼──────┐
-        │   Reranker  │
-        └──────┬──────┘
-               │
-        ┌──────▼──────────┐
-        │ Groq LLaMA API  │
-        └──────┬──────────┘
-               │
-        ┌──────▼──────┐
-        │   Response  │  │
-        └─────────────┘
+## 📂 Project Structure
+
+``
+docuquery/
+│
+├── data/
+│   ├── pdfs/              # PDF documents (policies, SOPs)
+│   └── markdown/          # Markdown files (FAQs)
+│
+├── storage/               # Generated indexes (FAISS + BM25)
+│
+├── build_index.py         # Index builder
+├── query_engine.py        # RAG query engine
+├── gradio_app.py          # Web UI
+├── requirements.txt       # Python dependencies
+└── README.md
 ```
 
----
 
-## 📊 Performance Metrics
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Vector Search | ~50ms | FAISS optimized |
-| Keyword Search | ~30ms | BM25 ranking |
-| LLM Response | ~1-2s | Groq API latency |
-| Total E2E | ~2-3s | Including formatting |
-
----
 
 ## 🚀 Quick Start
 
-### Installation
-
+### 1️⃣ Clone the repository
 ```bash
-# Clone repository
-git clone <repo-url>
-cd ibm_rag_project
+git clone https://github.com/yourusername/docuquery.git
+cd docuquery
+```
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
+### 2️⃣ Install dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-### Configuration
-
-Create `.env` file:
-```
-GROQ_API_KEY=your_groq_api_key_here
-VECTOR_DB_PATH=./data/vector_db
-KNOWLEDGE_BASE_PATH=./data/documents
+### 3️⃣ Build the index
+```bash
+python build_index.py
 ```
 
-### Run Application
-
+### 4️⃣ Launch the chatbot
 ```bash
 python gradio_app.py
 ```
 
-Access at: `http://127.0.0.1:7861`
+Open your browser at `http://localhost:7860` and start asking questions!
 
 ---
 
-## 📁 Project Structure
+## 💡 Example Queries
 
-```
-ibm_rag_project/
-├── gradio_app.py              # Main Gradio interface
-├── query_engine.py            # RAG engine logic
-├── requirements.txt           # Python dependencies
-├── .env                       # Environment variables
-├── README.md                  # This file
-│
-├── data/
-│   ├── documents/             # Knowledge base documents
-│   ├── vector_db/             # FAISS vector store
-│   ├── logo/
-│   │   └── ibm_logo.png       # IBM branding
-│   └── configs/
-│       └── retrieval_config.json
-│
-├── models/
-│   ├── embeddings/            # Sentence Transformer models
-│   └── ranking/               # Reranker models
-│
-```
+Try asking:
+
+- *"How many leaves can I carry forward?"*
+- *"What's the process for applying for sick leave?"*
+- *"Can I work from home?"*
+- *"What is the notice period for resignation?"*
 
 ---
 
-## 💻 Code Highlights
+## 🛠️ Tech Stack
 
-### Hybrid Search Implementation
-
-```python
-# Simultaneous vector + keyword search
-vector_results = search_vector_db(query, top_k=5)      # FAISS
-keyword_results = search_bm25(query, top_k=5)          # BM25
-
-# Merge and rerank results
-merged_results = rerank_results(
-    vector_results, 
-    keyword_results
-)
-
-# Generate answer using LLM
-answer = llm.generate(query, merged_results)
-```
-
-### Performance Optimization
-
-- **FAISS Indexing**: O(log n) search complexity
-- **BM25 Ranking**: Efficient term matching
-- **Batch Processing**: Parallel search execution
-- **Caching**: Query result memoization
+- **LlamaIndex** - RAG orchestration
+- **FAISS** - Vector similarity search
+- **BM25** - Keyword-based retrieval
+- **Gradio** - Interactive web UI
+- **OpenAI/HuggingFace** - Embeddings and LLM
 
 ---
 
-## 🎨 UI/UX Features
+## 📋 How It Works
 
-### Dark Enterprise Theme
-- Professional IBM color scheme (#0f62fe primary)
-- High contrast for accessibility
-- Responsive grid layout
-- Smooth animations & transitions
-
-### User Experience
-- Real-time processing feedback
-- Tabbed results view (Answer | Sources | Metrics | Debug)
-- Example questions for quick start
-- Advanced configuration panel
-- Technical debug information
+1. **Document Loading** - Reads PDFs and Markdown files
+2. **Chunking** - Splits documents into searchable segments
+3. **Indexing** - Creates vector (FAISS) and keyword (BM25) indexes
+4. **Query** - User asks a question
+5. **Retrieval** - Finds most relevant document chunks
+6. **Generation** - LLM generates answer using retrieved context
+7. **Citation** - Shows source documents for transparency
 
 ---
 
-## 🔒 Security & Compliance
+## 🎯 Use Cases
 
-- ✅ Environment variable protection (API keys in `.env`)
-- ✅ Input validation & sanitization
-- ✅ Error handling without data leakage
-- ✅ CORS configuration for API security
-- ✅ Rate limiting ready
+This architecture works for:
 
----
-
-## 📈 Deployment Options
-
-### Local Development
-```bash
-python gradio_app.py
-```
-
-### Docker Deployment
-```bash
-docker build -t ibm-rag .
-docker run -p 7861:7861 ibm-rag
-```
-
-### Hugging Face Spaces
-1. Push to GitHub
-2. Connect Hugging Face Spaces
-3. Auto-deploy with CI/CD
-
-### Cloud Platforms
-- **AWS**: EC2 + Lambda for serverless
-- **Azure**: App Service + Cognitive Services
-- **GCP**: Cloud Run + Vertex AI
+- ✅ HR Policy Chatbots
+- ✅ Technical Documentation Q&A
+- ✅ Legal Document Search
+- ✅ Customer Support Knowledge Bases
+- ✅ Internal Wiki Search
+- ✅ Research Paper Q&A
 
 ---
 
-## 📚 Learning Resources
+## 📝 Document Hierarchy
 
-- [Gradio Documentation](https://gradio.app/)
-- [Groq API Docs](https://console.groq.com/)
-- [FAISS Tutorial](https://github.com/facebookresearch/faiss)
-- [BM25 Algorithm](https://en.wikipedia.org/wiki/Okapi_BM25)
-- [RAG Paper](https://arxiv.org/abs/2005.11401)
+In this demo, documents follow a priority system:
+
+1. **Policy** (Highest Authority) - Company rules and regulations
+2. **SOP** (Procedures) - Step-by-step processes
+3. **FAQ** (Clarifications) - Common questions and answers
+
+---
+
+## ⚠️ Disclaimer
+
+This project uses **fictional company documents** for demonstration purposes only. It's designed as a learning resource and portfolio project.
 
 ---
 
 ## 🤝 Contributing
 
-1. Fork repository
-2. Create feature branch (`git checkout -b feature/enhancement`)
-3. Commit changes (`git commit -m 'Add feature'`)
-4. Push to branch (`git push origin feature/enhancement`)
-5. Open Pull Request
+Contributions are welcome! Feel free to:
+
+- Add new document formats
+- Improve retrieval accuracy
+- Enhance the UI
+- Add evaluation metrics
 
 ---
 
-## 📝 License
+## 📄 License
 
-MIT License - See LICENSE file for details
-
----
-
-## 👤 Author
-
-**Dandu Yeshwanth** | AI/ML Engineer
-- LinkedIn: [https://www.linkedin.com/in/yeshwanthdandu/]
-- GitHub: [https://github.com/YeshwanthDandu180903]
-- Email: yeshwanthdandu2003@gmail.com
+MIT License - feel free to use this for learning and building your own projects.
 
 ---
 
-## 🎓 Learning Outcomes
+## ⭐ Show Your Support
 
-This project demonstrates:
-- ✅ LLM Integration & API management
-- ✅ Hybrid search architecture design
-- ✅ Vector databases (FAISS)
-- ✅ Full-stack web development (Python)
-- ✅ UI/UX with professional design
-- ✅ Performance optimization
-- ✅ Enterprise software best practices
-- ✅ DevOps & deployment pipelines
+If you found this helpful, please star the repo and share it with others learning about RAG!
+
+---
+
+**Built with ❤️ to demonstrate practical RAG implementation**
+```
+
+---

@@ -3,6 +3,10 @@
 Thumbs.db
 desktop.ini
 
+
+
+
+*.txt
 # Python bytecode/cache
 __pycache__/
 *.py[cod]
@@ -13,7 +17,7 @@ __pycache__/
 .venv/
 venv/
 env/
-ibm_rag/
+rag_bot/
 
 # Tool caches
 .pytest_cache/

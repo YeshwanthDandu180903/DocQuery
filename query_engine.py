@@ -1,218 +1,99 @@
-"""
-Hybrid query engine for IBM Knowledge RAG Assistant.
-
-Responsibilities:
-- Load persisted FAISS vector store + BM25 corpus
-- Perform hybrid retrieval (vector similarity + BM25 keyword)
-- Fuse and re-rank results by a simple scoring heuristic
-- Generate an answer using LangChain LLM (OpenAI if key present, else fallback pseudo model)
-- Return answer + cited sources
-
-Usage:
-    from query_engine import IBMKnowledgeRAG
-    engine = IBMKnowledgeRAG()
-    answer, sources = engine.answer_question("What are IBM's AI research goals?")
-
-Design Notes:
-- Simplified scoring: normalized vector similarity + BM25 score (log form)
-- Citations: top unique sources from final ranked chunks
-- Fallback model: deterministic template-based summarizer if no OpenAI API key
-"""
 from __future__ import annotations
-
-import os
-import json
-import math
-import time
+import json, os
 from pathlib import Path
-from typing import List, Tuple, Dict
-
-import numpy as np
-from dotenv import load_dotenv
+from typing import List, Tuple
 
 from rank_bm25 import BM25Okapi
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_core.documents import Document
-
-# LLM: GROQ only (langchain-groq)
-from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import Runnable
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-from langchain_groq import ChatGroq
+EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
+ROOT = Path(__file__).parent
+VSTORE_DIR = ROOT / "storage/faiss_lc"
+BM25_PATH = ROOT / "storage/bm25_corpus.txt"
+CORPUS_JSONL = ROOT / "storage/corpus.jsonl"
 
-load_dotenv()
-EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+SYSTEM_PROMPT = """
+You are an Internal HR Knowledge Agent for Abhimanyu Industries.
 
-PROJECT_ROOT = Path(__file__).parent
-STORAGE_DIR = PROJECT_ROOT / "storage"
-VSTORE_DIR = STORAGE_DIR / "faiss_lc"
-BM25_PATH = STORAGE_DIR / "bm25_corpus.txt"
-CORPUS_JSONL = STORAGE_DIR / "corpus.jsonl"
+Answer ONLY using the retrieved context.
+If information is missing, say:
+"This information is not defined in the current Abhimanyu Industries documentation."
+"""
 
-DEFAULT_PROMPT = """You are the IBM Knowledge RAG Assistant.
-Answer the user's question clearly. Use bullet points only if helpful.
-Cite sources by their file or record name inside parentheses, e.g. (source.pdf, ibm_hr_row_2).
-If unsure, say you are unsure rather than hallucinating.
+class HRQueryEngine:
 
-Question: {question}
-Context Snippets:
-{context}
+    def __init__(self):
+        self.top_k = 3
+        self.embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+        self.vstore = FAISS.load_local(str(VSTORE_DIR), self.embeddings, allow_dangerous_deserialization=True)
+        self.corpus = self._load_corpus()
+        self.bm25 = BM25Okapi([c["text"].lower().split() for c in self.corpus])
+        self.llm = self._build_llm()
 
-Answer:"""
+    def _load_corpus(self):
+        with open(CORPUS_JSONL, encoding="utf-8") as f:
+            return [json.loads(l) for l in f]
 
-class IBMKnowledgeRAG:
-    """Hybrid retrieval + answer generation engine."""
-
-    def __init__(self, top_k_vector: int = 5, top_k_keyword: int = 5):
-        load_dotenv()  # load .env if present
-        self.top_k_vector = top_k_vector
-        self.top_k_keyword = top_k_keyword
-        self.embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL_NAME)
-        self.vector_store = self._load_vector_store()
-        self.bm25 = self._load_bm25()
-        self.corpus_records = self._load_corpus_records()
-        self.llm_chain: Runnable = self._build_llm_chain()
-
-    # ------------------ Loading ------------------
-    def _load_vector_store(self) -> FAISS:
-        if not VSTORE_DIR.exists():
-            raise FileNotFoundError("FAISS vector store not found. Run build_index.py first.")
-        return FAISS.load_local(str(VSTORE_DIR), self.embeddings, allow_dangerous_deserialization=True)
-
-    def _load_bm25(self) -> BM25Okapi:
-        if not BM25_PATH.exists():
-            raise FileNotFoundError("BM25 corpus not found. Run build_index.py first.")
-        corpus_text = BM25_PATH.read_text(encoding="utf-8")
-        docs = [d for d in corpus_text.split("\n\n") if d.strip()]
-        tokenized = [d.lower().split() for d in docs]
-        return BM25Okapi(tokenized)
-
-    def _load_corpus_records(self) -> List[Dict[str, str]]:
-        records: List[Dict[str, str]] = []
-        if CORPUS_JSONL.exists():
-            with open(CORPUS_JSONL, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        records.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
-        return records
-
-    def _build_llm_chain(self) -> Runnable:
-        prompt = PromptTemplate(input_variables=["question", "context"], template=DEFAULT_PROMPT)
-        # Strictly require GROQ. Do not fall back to other providers.
-        groq_key = os.getenv("GROQ_API_KEY")
-        if not groq_key:
-            raise EnvironmentError(
-                "GROQ_API_KEY environment variable is required. Set GROQ_API_KEY to use the Groq LLM."
-            )
-
-        model_name = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-        llm = ChatGroq(model=model_name, temperature=float(os.getenv("GROQ_TEMPERATURE", "0.2")))
-        # Use LangChain Expression Language (LCEL) instead of the legacy LLMChain
+    def _build_llm(self):
+        llm = ChatGroq(
+            model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+            temperature=0
+        )
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT.strip()),
+            (
+                "human",
+                "Question: {question}\n\nContext:\n{context}\n\nAnswer:"
+            ),
+        ])
         return prompt | llm | StrOutputParser()
 
-    # ------------------ Retrieval ------------------
-    def _vector_search(self, query: str) -> List[Tuple[Document, float]]:
-        # similarity search returns Documents; FAISS similarity scores accessible via similarity attribute? Provide manual embedding similarity.
-        query_emb = self.embeddings.embed_query(query)
-        docs = self.vector_store.similarity_search(query, k=self.top_k_vector)
-        results: List[Tuple[Document, float]] = []
-        # Recompute cosine similarity for transparency
-        for d in docs:
-            # FAISS doesn't expose embedding directly; re-embed chunk content
-            chunk_emb = self.embeddings.embed_query(d.page_content)
-            sim = self._cosine(query_emb, chunk_emb)
-            results.append((d, sim))
+    def classify_intent(self, q: str) -> str:
+        q = q.lower()
+        if any(k in q for k in ["how", "process", "apply"]):
+            return "sop"
+        if any(k in q for k in ["who", "what if", "when"]):
+            return "faq"
+        return "policy"
+
+    def retrieve(self, q: str, intent: str):
+        vec_docs = self.vstore.similarity_search(q, k=20)
+        vec_docs = [d for d in vec_docs if d.metadata["doc_type"] == intent]
+
+        scores = self.bm25.get_scores(q.lower().split())
+        kw_docs = [
+            (self.corpus[i], scores[i])
+            for i in range(len(scores))
+            if self.corpus[i]["doc_type"] == intent
+        ]
+
+        combined = {}
+        for d in vec_docs:
+            combined[d.page_content] = d.metadata["source"]
+        for rec, _ in kw_docs:
+            combined.setdefault(rec["text"], rec["source"])
+
+        results = list(combined.items())[:self.top_k]
         return results
 
-    def _keyword_search(self, query: str) -> List[Tuple[str, float]]:
-        tokens = query.lower().split()
-        scores = self.bm25.get_scores(tokens)
-        # Pair each score with raw text (index matches corpus_records)
-        pairs = []
-        for i, score in enumerate(scores):
-            if i < len(self.corpus_records):
-                pairs.append((self.corpus_records[i]["text"], score))
-        # Sort descending BM25 score
-        pairs.sort(key=lambda x: x[1], reverse=True)
-        return pairs[: self.top_k_keyword]
+    def answer_question(self, question: str) -> Tuple[str, List[str]]:
+        intent = self.classify_intent(question)
+        retrieved = self.retrieve(question, intent)
 
-    @staticmethod
-    def _cosine(a: List[float], b: List[float]) -> float:
-        a_np = np.array(a)
-        b_np = np.array(b)
-        denom = (np.linalg.norm(a_np) * np.linalg.norm(b_np)) or 1e-9
-        return float(np.dot(a_np, b_np) / denom)
+        if not retrieved:
+            return "I'm unable to answer this based on the current Abhimanyu Industries documentation.", []
 
-    def _fuse_results(self, vector_results: List[Tuple[Document, float]], keyword_results: List[Tuple[str, float]]):
-        # Normalize scores
-        vec_scores = [v for _, v in vector_results] or [0.0]
-        kw_scores = [k for _, k in keyword_results] or [0.0]
-        max_vec = max(vec_scores)
-        max_kw = max(kw_scores)
-        fused: List[Tuple[str, str, float]] = []  # (source, text, fused_score)
+        context = "\n\n".join(t for t, _ in retrieved)
+        sources = list({src for _, src in retrieved})
 
-        for doc, sim in vector_results:
-            norm_sim = sim / max_vec if max_vec else 0.0
-            fused.append((doc.metadata.get("source", "unknown"), doc.page_content, norm_sim * 0.6))
-        for text, score in keyword_results:
-            norm_kw = score / max_kw if max_kw else 0.0
-            # Attempt to find source via corpus_records match
-            source = self._find_source_by_text(text)
-            fused.append((source, text, norm_kw * 0.4))
+        answer = self.llm.invoke({
+            "question": question,
+            "context": context
+        })
 
-        # Combine duplicate sources by taking max score per chunk text
-        fused.sort(key=lambda x: x[2], reverse=True)
-        return fused[: max(self.top_k_vector, self.top_k_keyword)]
-
-    def _find_source_by_text(self, text: str) -> str:
-        for rec in self.corpus_records:
-            if rec["text"] == text:
-                return rec.get("source", "unknown")
-        return "unknown"
-
-    # ------------------ Answer Generation ------------------
-    def _generate_answer(self, question: str, contexts: List[Tuple[str, str, float]]) -> Tuple[str, List[str]]:
-        # Build context string with source markers
-        context_lines = []
-        cited_sources = []
-        for source, chunk, _score in contexts:
-            context_lines.append(f"Source: {source}\n{chunk}")
-            cited_sources.append(source)
-        cited_sources = list(dict.fromkeys(cited_sources))  # preserve order unique
-        joined_context = "\n\n".join(context_lines[:8])
-
-        if self.llm_chain:
-            answer = self.llm_chain.invoke({"question": question, "context": joined_context}).strip()
-        else:
-            # Fallback deterministic summarizer
-            answer = (
-                "(Fallback) Based on available internal documents, key points include: "
-                + "; ".join([chunk[:120] + ("..." if len(chunk) > 120 else "") for _, chunk, _ in contexts[:3]])
-                + f"\nSources: {', '.join(cited_sources)}"
-            )
-        return answer, cited_sources
-
-    # ------------------ Public API ------------------
-    def answer_question(self, question: str) -> Tuple[str, List[str], float]:
-        start = time.time()
-        vector_results = self._vector_search(question)
-        keyword_results = self._keyword_search(question)
-        fused = self._fuse_results(vector_results, keyword_results)
-        answer, sources = self._generate_answer(question, fused)
-        latency = time.time() - start
-        return answer, sources, latency
-
-
-if __name__ == "__main__":
-    engine = IBMKnowledgeRAG()
-    q = "What are IBM's current AI research goals?"
-    ans, srcs, lat = engine.answer_question(q)
-    print(f"Q: {q}\n\nA: {ans}\nSources: {srcs}\nLatency: {lat:.2f}s")
+        return answer, sources
