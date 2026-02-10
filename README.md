@@ -37,23 +37,28 @@ This reflects real-world usage in **financial analytics, strategy, and decision-
 
 ---
 
-## 📂 Project Structure
+## 📁 Project Structure
 
+The project follows a clean and modular structure to clearly separate  
+**data, indexing logic, retrieval engine, and user interface**.
+
+```text
 docuquery/
 │
 ├── data/
-│ ├── pdfs/
-│ │ ├── hr_documents/ # Policies, SOPs
-│ │ └── financial_reports/ # Financial analysis PDFs
-│ └── markdown/ # FAQs
+│   ├── pdfs/
+│   │   ├── hr_documents/          # HR Policies & SOP documents
+│   │   └── financial_reports/     # Financial analysis & performance PDFs
+│   │
+│   └── markdown/                 # FAQ documents (Markdown)
 │
-├── storage/ # Generated indexes (FAISS + BM25)
+├── storage/                      # Generated indexes (FAISS + BM25)
 │
-├── build_index.py # Index builder
-├── query_engine.py # RAG query engine
-├── gradio_app.py # Web UI
-├── requirements.txt # Python dependencies
-└── README.md
+├── build_index.py                # Builds vector & keyword indexes
+├── query_engine.py               # Hybrid RAG query engine (FAISS + BM25 + LLM)
+├── gradio_app.py                 # Interactive Web UI (Gradio)
+├── requirements.txt              # Python dependencies
+└── README.md                     # Project documentation
 
 
 
