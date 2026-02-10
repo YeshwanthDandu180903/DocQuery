@@ -55,6 +55,8 @@ class HRQueryEngine:
 
     def classify_intent(self, q: str) -> str:
         q = q.lower()
+        if any(k in q for k in ["sustain", "climate", "environment", "report", "growth", "finance", "financial", "revenue", "profit", "loss", "fiscal", "year", "quarter"]):
+            return "financial"
         if any(k in q for k in ["how", "process", "apply"]):
             return "sop"
         if any(k in q for k in ["who", "what if", "when"]):
@@ -71,6 +73,7 @@ class HRQueryEngine:
             for i in range(len(scores))
             if self.corpus[i]["doc_type"] == intent
         ]
+        kw_docs.sort(key=lambda x: x[1], reverse=True)
 
         combined = {}
         for d in vec_docs:

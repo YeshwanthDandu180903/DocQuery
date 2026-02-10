@@ -1,156 +1,179 @@
 # 📚 DocuQuery
 
-> An intelligent document question-answering system powered by RAG (Retrieval-Augmented Generation)
+> An intelligent document question-answering system powered by **RAG (Retrieval-Augmented Generation)**
 
-**DocuQuery** lets you ask questions and get accurate answers directly from your documents—no hallucinations, just facts.
+**DocuQuery** enables users to ask natural-language questions and receive **accurate, source-grounded answers** directly from internal documents — **no hallucinations, only facts**.
 
-This demo uses HR documents (policies, SOPs, FAQs) from a fictional company to showcase how RAG can be applied to any document collection.
+This project demonstrates a **scalable RAG architecture** that was:
+- First validated using **employee-facing HR documents** (policies, SOPs, FAQs)
+- Then extended to **financial analytics documents**, including a realistic **Company Financial Analysis Report**
+
+The same architecture supports both **operational knowledge** and **financial & business insight extraction**, mirroring real enterprise AI workflows.
 
 ---
 
 ## ✨ Features
 
-- 🔍 **Hybrid Search** - Combines semantic (FAISS) and keyword (BM25) retrieval
-- 📄 **Multi-Format Support** - Works with PDFs and Markdown files
-- 🎯 **Source Citations** - Every answer links back to source documents
-- 🚫 **No Hallucinations** - Answers only from your documents
-- 💬 **Interactive UI** - Clean Gradio interface for easy querying
+- 🔍 **Hybrid Search** – Combines semantic (FAISS) and keyword (BM25) retrieval  
+- 📄 **Multi-Format Support** – Works with PDFs and Markdown files  
+- 🎯 **Source Citations** – Every answer is backed by source documents  
+- 🚫 **Hallucination Control** – Responses are strictly document-grounded  
+- 💬 **Interactive UI** – Clean Gradio interface for easy querying  
+
+---
+
+## 🏦 Financial Analytics Context
+
+In addition to HR documents, DocuQuery processes **financial analysis reports** prepared in an analyst-style format, covering:
+
+- Historical **sales and revenue trends**
+- **Cost of Goods Sold (COGS)** and operating expenses
+- **Gross profit, net profit, and margin analysis**
+- Business drivers and performance insights
+- Market and economic context
+- Analyst conclusions supporting forecasting and investment decisions
+
+This reflects real-world usage in **financial analytics, strategy, and decision-support teams**.
 
 ---
 
 ## 📂 Project Structure
 
-``
 docuquery/
 │
 ├── data/
-│   ├── pdfs/              # PDF documents (policies, SOPs)
-│   └── markdown/          # Markdown files (FAQs)
+│ ├── pdfs/
+│ │ ├── hr_documents/ # Policies, SOPs
+│ │ └── financial_reports/ # Financial analysis PDFs
+│ └── markdown/ # FAQs
 │
-├── storage/               # Generated indexes (FAISS + BM25)
+├── storage/ # Generated indexes (FAISS + BM25)
 │
-├── build_index.py         # Index builder
-├── query_engine.py        # RAG query engine
-├── gradio_app.py          # Web UI
-├── requirements.txt       # Python dependencies
+├── build_index.py # Index builder
+├── query_engine.py # RAG query engine
+├── gradio_app.py # Web UI
+├── requirements.txt # Python dependencies
 └── README.md
-```
 
 
+
+---
 
 ## 🚀 Quick Start
 
 ### 1️⃣ Clone the repository
 ```bash
-git clone https://github.com/yourusername/docuquery.git
+git clone https://github.com/YeshwanthDandu180903/docuquery.git
 cd docuquery
-```
 
-### 2️⃣ Install dependencies
-```bash
+2️⃣ Install dependencies
 pip install -r requirements.txt
-```
 
-### 3️⃣ Build the index
-```bash
+3️⃣ Build the index
 python build_index.py
-```
 
-### 4️⃣ Launch the chatbot
-```bash
+4️⃣ Launch the chatbot
 python gradio_app.py
-```
 
-Open your browser at `http://localhost:7860` and start asking questions!
 
----
+Open your browser at http://localhost:7860 and start asking questions.
 
-## 💡 Example Queries
+💡 Example Queries
+HR & Operational Queries
 
-Try asking:
+"How many leaves can I carry forward?"
 
-- *"How many leaves can I carry forward?"*
-- *"What's the process for applying for sick leave?"*
-- *"Can I work from home?"*
-- *"What is the notice period for resignation?"*
+"What is the notice period for resignation?"
 
----
+"What is the WFH approval process?"
 
-## 🛠️ Tech Stack
+Financial Analytics Queries
 
-- **LlamaIndex** - RAG orchestration
-- **FAISS** - Vector similarity search
-- **BM25** - Keyword-based retrieval
-- **Gradio** - Interactive web UI
-- **OpenAI/HuggingFace** - Embeddings and LLM
+"Summarize the company’s financial performance from FY 2021 to FY 2025."
 
----
+"How did sales growth impact net profit margins?"
 
-## 📋 How It Works
+"What were the major cost drivers affecting profitability?"
 
-1. **Document Loading** - Reads PDFs and Markdown files
-2. **Chunking** - Splits documents into searchable segments
-3. **Indexing** - Creates vector (FAISS) and keyword (BM25) indexes
-4. **Query** - User asks a question
-5. **Retrieval** - Finds most relevant document chunks
-6. **Generation** - LLM generates answer using retrieved context
-7. **Citation** - Shows source documents for transparency
+"Identify key financial risks mentioned in the report."
 
----
+"What insights support future forecasting and investment decisions?"
 
-## 🎯 Use Cases
+🛠️ Tech Stack
 
-This architecture works for:
+LlamaIndex – RAG orchestration
 
-- ✅ HR Policy Chatbots
-- ✅ Technical Documentation Q&A
-- ✅ Legal Document Search
-- ✅ Customer Support Knowledge Bases
-- ✅ Internal Wiki Search
-- ✅ Research Paper Q&A
+FAISS – Vector similarity search
 
----
+BM25 – Keyword-based retrieval
 
-## 📝 Document Hierarchy
+Gradio – Interactive web UI
 
-In this demo, documents follow a priority system:
+OpenAI / HuggingFace / Groq – Embeddings and LLMs
 
-1. **Policy** (Highest Authority) - Company rules and regulations
-2. **SOP** (Procedures) - Step-by-step processes
-3. **FAQ** (Clarifications) - Common questions and answers
+📋 How It Works
 
----
+Document loading from PDFs and Markdown files
 
-## ⚠️ Disclaimer
+Text chunking for efficient retrieval
 
-This project uses **fictional company documents** for demonstration purposes only. It's designed as a learning resource and portfolio project.
+Hybrid indexing using FAISS and BM25
 
----
+Natural-language user query
 
-## 🤝 Contributing
+Retrieval of relevant document chunks
 
-Contributions are welcome! Feel free to:
+Grounded response generation via LLM
 
-- Add new document formats
-- Improve retrieval accuracy
-- Enhance the UI
-- Add evaluation metrics
+Source citation for transparency
 
----
+🎯 Use Cases
 
-## 📄 License
+✅ HR Policy & Employee Knowledge Chatbots
 
-MIT License - feel free to use this for learning and building your own projects.
+✅ Financial Report & Performance Analysis
 
----
+✅ Cost, Expense & Profitability Insights
 
-## ⭐ Show Your Support
+✅ Business & Investment Decision Support
 
-If you found this helpful, please star the repo and share it with others learning about RAG!
+✅ Risk & Compliance Document Review
 
----
+✅ Internal Knowledge & Analytics Systems
 
-**Built with ❤️ to demonstrate practical RAG implementation**
-```
+📝 Document Hierarchy
 
----
+Policy – Highest authority (rules & regulations)
+
+SOP – Procedural guidance
+
+FAQ – Clarifications and common questions
+
+Financial Analysis Reports – Analyst-style business insights
+
+⚠️ Disclaimer
+
+All documents are fictional and created solely for demonstration and learning purposes.
+This project showcases document intelligence and financial analytics workflows, not real company data.
+
+🤝 Contributing
+
+Contributions are welcome:
+
+Add new document formats
+
+Improve retrieval accuracy
+
+Extend financial analytics coverage
+
+Add evaluation metrics
+
+📄 License
+
+MIT License – free to use for learning and portfolio projects.
+
+⭐ Show Your Support
+
+If you found this project helpful, please ⭐ the repository and share it with others learning about RAG and financial analytics.
+
+Built with ❤️ to demonstrate scalable RAG systems for operational and financial intelligence
